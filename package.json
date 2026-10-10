@@ -27,7 +27,7 @@
   },
   "type": "module",
   "scripts": {
-    "dev": "vinext dev",
+    "dev": "vinext dev --host 0.0.0.0",
     "build": "vinext build",
     "start": "wrangler dev --config dist/server/wrangler.json",
     "deploy": "vinext-cloudflare deploy --config dist/server/wrangler.json",
