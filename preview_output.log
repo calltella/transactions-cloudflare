@@ -380,3 +380,5 @@ Attaching additional modules:
 [wrangler:info] GET /_next/static/chunks/layout-segment-context-O-BK8PUI.js 200 OK (14ms)
 [wrangler:info] GET /_next/static/chunks/index-B4PAR6ZM.js 200 OK (22ms)
 [wrangler:info] GET /_next/static/chunks/vinext-DHDNT2Af.js 200 OK (22ms)
+⎔ Reloading local server...
+⎔ Local server updated and ready
