@@ -15,18 +15,21 @@
 	"images": {
 		"binding": "IMAGES"
 	},
+	"vars": {
+    "DEVELOPER_USER_IDS": "c34a94a8-fcb8-4ca8-a1ab-6f097059effd"
+  },
 	"observability": {
 		"enabled": true
 	},
 	"upload_source_maps": true,
 	"compatibility_flags": [
-		"nodejs_compat"
+		"nodejs_compat",
+		"enable_weak_ref"
 	],
 	"hyperdrive": [
 		{
 			"binding": "HYPERDRIVE",
-			"id": "ab89d131f0a44480978142bafe1bf70f",
-			"localConnectionString": "postgresql://postgres:59201f1d44183e48c90d1e09c5899634@supabase-db:5432/postgres"
+			"id": "ab89d131f0a44480978142bafe1bf70f"
 		}
 	]
 	/**

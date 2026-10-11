@@ -23,7 +23,7 @@ export default function DbTestPage() {
   const runTest = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/db-test", { cache: "no-store" });
+      const res = await fetch("/api/developer/db-test", { cache: "no-store" });
       const json: DbTestResponse = await res.json();
       setData(json);
     } catch (err) {
@@ -47,10 +47,10 @@ export default function DbTestPage() {
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
             <Link
-              href="/"
+              href="/developer"
               className="text-indigo-600 dark:text-indigo-400 hover:underline text-sm flex items-center gap-1"
             >
-              &larr; Back to Home
+              &larr; 開発画面へ戻る
             </Link>
           </div>
           <span className="text-xs text-gray-500 dark:text-gray-400">
@@ -166,7 +166,7 @@ export default function DbTestPage() {
                     <div className="p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-100 dark:border-gray-800 md:col-span-2">
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-xs uppercase font-semibold text-gray-400 tracking-wider">
-                          Public Tables ({data.tablesCount ?? 0})
+                          Public Tables ({data.tablesCount ?? 0}, showing up to 10)
                         </span>
                       </div>
                       {data.tables.length > 0 ? (

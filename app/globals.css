@@ -12,6 +12,23 @@ body {
   margin: 0;
 }
 
+body > main { min-height: calc(100dvh - 4rem); }
+.nav-summary { list-style: none; cursor: pointer; }
+.nav-summary::-webkit-details-marker { display: none; }
+.nav-dropdown {
+  position: absolute;
+  top: calc(100% + 0.75rem);
+  padding: 0.5rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.875rem;
+  background: white;
+  box-shadow: 0 12px 32px rgb(15 23 42 / 0.12);
+}
+:focus-visible { outline: 2px solid #6366f1; outline-offset: 3px; }
+@media (prefers-color-scheme: dark) {
+  .nav-dropdown { background: #111827; border-color: #374151; }
+}
+
 a {
   color: inherit;
 }

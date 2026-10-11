@@ -1,10 +1,8 @@
 import { createBrowserClient } from "@supabase/ssr";
+import { getSupabaseConfig } from "./config";
+import type { Database } from "@/src/lib/db/database.types";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
-
-export const createClient = () =>
-  createBrowserClient(
-    supabaseUrl!,
-    supabaseKey!,
-  );
+export const createClient = () => {
+  const { url, key } = getSupabaseConfig();
+  return createBrowserClient<Database>(url, key);
+};

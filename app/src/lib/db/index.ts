@@ -38,8 +38,6 @@ export async function testDatabaseConnection(
     connectionString = process.env.DATABASE_URL;
     connectionStringSource = connectionString ? "Local DATABASE_URL" : "none";
   }
-  console.log("NODE_ENV: ", process.env.NODE_ENV);
-  console.log("DATABASE_URL: ", process.env.DATABASE_URL);
 
   if (!connectionString) {
     return {
@@ -55,6 +53,8 @@ export async function testDatabaseConnection(
   const client = new Client({
     connectionString,
     connectionTimeoutMillis: 5000,
+    query_timeout: 5000,
+    statement_timeout: 5000,
     // Hyperdrive経由では接続先のTLS設定に従う。
     // SSL設定を独自に上書きしない。
   });
@@ -66,17 +66,20 @@ export async function testDatabaseConnection(
       current_time: Date;
       version: string;
       database_name: string;
+      tables_count: number;
     }>(`
       SELECT
         NOW() AS current_time,
         version() AS version,
-        current_database() AS database_name
+        current_database() AS database_name,
+        (SELECT COUNT(*)::int FROM information_schema.tables
+         WHERE table_schema = 'public' AND table_type = 'BASE TABLE') AS tables_count
     `);
 
     const tablesResult = await client.query<{ table_name: string }>(`
       SELECT table_name
       FROM information_schema.tables
-      WHERE table_schema = 'public'
+      WHERE table_schema = 'public' AND table_type = 'BASE TABLE'
       ORDER BY table_name
       LIMIT 10
     `);
@@ -90,17 +93,17 @@ export async function testDatabaseConnection(
         : undefined,
       version: row?.version,
       database: row?.database_name,
-      tablesCount: tablesResult.rowCount ?? 0,
+      tablesCount: row?.tables_count ?? 0,
       tables: tablesResult.rows.map((r) => r.table_name),
       latencyMs: Date.now() - startTime,
-      connectionStringSource: "Cloudflare Hyperdrive binding",
+      connectionStringSource,
     };
-  } catch (err) {
+  } catch {
     return {
       success: false,
-      error: err instanceof Error ? err.message : String(err),
+      error: "Database connection or query failed. Check the database and Hyperdrive configuration.",
       latencyMs: Date.now() - startTime,
-      connectionStringSource: "Cloudflare Hyperdrive binding",
+      connectionStringSource,
     };
   } finally {
     // Hyperdriveの接続プールはCloudflare側が管理する。

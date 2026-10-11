@@ -8,6 +8,7 @@
     "@supabase/supabase-js": "^2.117.3",
     "@vinext/cloudflare": "latest",
     "drizzle-orm": "^0.45.4",
+    "lucide-react": "^1.55.0",
     "pg": "^8.23.1",
     "postgres": "^3.4.9",
     "react": "latest",
@@ -31,6 +32,7 @@
   },
   "type": "module",
   "scripts": {
+    "test": "node --experimental-vm-modules --test tests/*.test.mjs",
     "dev": "vinext dev --host 0.0.0.0",
     "build": "vinext build",
     "start": "wrangler dev --config dist/server/wrangler.json",

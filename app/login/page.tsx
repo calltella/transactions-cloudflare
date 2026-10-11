@@ -1,4 +1,4 @@
-import { login, signup } from './actions'
+import { login } from './actions'
 
 export default async function LoginPage({
   searchParams,
@@ -36,6 +36,8 @@ export default async function LoginPage({
                 id="email"
                 name="email"
                 type="email"
+                autoComplete="email"
+                maxLength={254}
                 required
                 className="w-full px-3 py-2 mt-1 border border-gray-300 dark:border-gray-700 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-white"
                 placeholder="you@example.com"
@@ -49,6 +51,8 @@ export default async function LoginPage({
                 id="password"
                 name="password"
                 type="password"
+                autoComplete="current-password"
+                maxLength={4096}
                 required
                 className="w-full px-3 py-2 mt-1 border border-gray-300 dark:border-gray-700 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-white"
                 placeholder="••••••••"
@@ -63,13 +67,6 @@ export default async function LoginPage({
               className="w-full py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
             >
               Log in
-            </button>
-            <button
-              formAction={signup}
-              type="submit"
-              className="w-full py-2 px-4 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-md text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-            >
-              Sign up
             </button>
           </div>
         </form>
