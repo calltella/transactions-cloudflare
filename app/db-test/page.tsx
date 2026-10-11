@@ -1,5 +1,5 @@
 "use client";
-
+// /app/app/db-test/page.tsx
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 
@@ -95,17 +95,15 @@ export default function DbTestPage() {
             <div className="space-y-6">
               {/* Status Header Badge */}
               <div
-                className={`p-4 rounded-lg flex items-center justify-between border ${
-                  data.success
+                className={`p-4 rounded-lg flex items-center justify-between border ${data.success
                     ? "bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800 text-emerald-900 dark:text-emerald-200"
                     : "bg-rose-50 dark:bg-rose-950/40 border-rose-200 dark:border-rose-800 text-rose-900 dark:text-rose-200"
-                }`}
+                  }`}
               >
                 <div className="flex items-center gap-3">
                   <span
-                    className={`inline-block w-3 h-3 rounded-full ${
-                      data.success ? "bg-emerald-500 animate-pulse" : "bg-rose-500"
-                    }`}
+                    className={`inline-block w-3 h-3 rounded-full ${data.success ? "bg-emerald-500 animate-pulse" : "bg-rose-500"
+                      }`}
                   />
                   <div>
                     <span className="font-semibold text-base">

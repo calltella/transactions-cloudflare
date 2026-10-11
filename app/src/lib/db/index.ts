@@ -12,31 +12,41 @@ export interface DbQueryResult {
   error?: string;
 }
 
-export async function testDatabaseConnection(hyperdriveBinding?: { connectionString?: string }): Promise<DbQueryResult> {
+export interface HyperdriveBinding {
+  connectionString: string;
+}
+
+/**
+ * Cloudflare Hyperdrive経由でSupabase PostgreSQLへの接続を確認する。
+ *
+ * @param hyperdriveBinding WranglerのHYPERDRIVEバインディング
+ */
+export async function testDatabaseConnection(
+  hyperdriveBinding?: HyperdriveBinding,
+): Promise<DbQueryResult> {
   const startTime = Date.now();
 
-  // Determine connection string from parameter, environment variables, or global Worker bindings
-  let connectionString: string | undefined = undefined;
+  let connectionString: string | undefined;
   let connectionStringSource = "none";
 
+  // Cloudflare WorkersではHyperdriveを優先する
   if (hyperdriveBinding?.connectionString) {
     connectionString = hyperdriveBinding.connectionString;
-    connectionStringSource = "Hyperdrive parameter binding";
-  } else if (process.env.DATABASE_URL) {
+    connectionStringSource = "Cloudflare Hyperdrive";
+  } else if (process.env.NODE_ENV !== "production") {
+    // ローカルのVinext開発用
     connectionString = process.env.DATABASE_URL;
-    connectionStringSource = "DATABASE_URL env";
-  } else if (process.env.HYPERDRIVE_URL) {
-    connectionString = process.env.HYPERDRIVE_URL;
-    connectionStringSource = "HYPERDRIVE_URL env";
-  } else if ((process.env as any).HYPERDRIVE?.connectionString) {
-    connectionString = (process.env as any).HYPERDRIVE.connectionString;
-    connectionStringSource = "HYPERDRIVE env binding";
+    connectionStringSource = connectionString ? "Local DATABASE_URL" : "none";
   }
+  console.log("NODE_ENV: ", process.env.NODE_ENV);
+  console.log("DATABASE_URL: ", process.env.DATABASE_URL);
 
   if (!connectionString) {
     return {
       success: false,
-      error: "Database connection string is not configured. Please set DATABASE_URL, HYPERDRIVE_URL, or bind a HYPERDRIVE resource.",
+      error:
+        "Database connection is not configured. " +
+        "Pass HYPERDRIVE in Cloudflare Workers or set DATABASE_URL locally.",
       latencyMs: Date.now() - startTime,
       connectionStringSource,
     };
@@ -45,46 +55,60 @@ export async function testDatabaseConnection(hyperdriveBinding?: { connectionStr
   const client = new Client({
     connectionString,
     connectionTimeoutMillis: 5000,
+    // Hyperdrive経由では接続先のTLS設定に従う。
+    // SSL設定を独自に上書きしない。
   });
 
   try {
     await client.connect();
 
-    const infoResult = await client.query(
-      "SELECT NOW() as current_time, version() as version, current_database() as database_name"
-    );
+    const infoResult = await client.query<{
+      current_time: Date;
+      version: string;
+      database_name: string;
+    }>(`
+      SELECT
+        NOW() AS current_time,
+        version() AS version,
+        current_database() AS database_name
+    `);
 
-    const tablesResult = await client.query(
-      "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' LIMIT 10"
-    );
+    const tablesResult = await client.query<{ table_name: string }>(`
+      SELECT table_name
+      FROM information_schema.tables
+      WHERE table_schema = 'public'
+      ORDER BY table_name
+      LIMIT 10
+    `);
 
-    await client.end();
-
-    const latencyMs = Date.now() - startTime;
-    const row = infoResult.rows[0] || {};
+    const row = infoResult.rows[0];
 
     return {
       success: true,
-      now: row.current_time ? new Date(row.current_time).toISOString() : undefined,
-      version: row.version,
-      database: row.database_name,
+      now: row?.current_time
+        ? new Date(row.current_time).toISOString()
+        : undefined,
+      version: row?.version,
+      database: row?.database_name,
       tablesCount: tablesResult.rowCount ?? 0,
-      tables: tablesResult.rows.map((r: { table_name: string }) => r.table_name),
-      latencyMs,
-      connectionStringSource,
+      tables: tablesResult.rows.map((r) => r.table_name),
+      latencyMs: Date.now() - startTime,
+      connectionStringSource: "Cloudflare Hyperdrive binding",
     };
   } catch (err) {
-    try {
-      await client.end();
-    } catch {
-      // Ignore cleanup error
-    }
-
     return {
       success: false,
       error: err instanceof Error ? err.message : String(err),
       latencyMs: Date.now() - startTime,
-      connectionStringSource,
+      connectionStringSource: "Cloudflare Hyperdrive binding",
     };
+  } finally {
+    // Hyperdriveの接続プールはCloudflare側が管理する。
+    // クライアント側の接続は必ず終了する。
+    try {
+      await client.end();
+    } catch {
+      // 元の接続エラーを優先する
+    }
   }
 }
