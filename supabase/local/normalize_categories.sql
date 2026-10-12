@@ -15,7 +15,7 @@ declare
   registered_parents bigint;
   registered_children bigint;
 begin
-  if actor is distinct from 'd629d117-2f96-481b-9980-329fbf581f68'::uuid then
+  if actor is distinct from 'c3063ccd-d819-49ef-98cf-948681c33b03'::uuid then
     raise exception 'Developer access required' using errcode = '42501';
   end if;
 
