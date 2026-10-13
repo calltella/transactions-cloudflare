@@ -21,3 +21,11 @@ test('history includes all card withdrawals in month, not individual purchases',
  const entry=plannedCardEntry(payments[1],rows,[{id:2,name:'支出'}],'カード','2026-10-11');
  assert.equal(entry.date,'2026-10-27');assert.equal(entry.change,-900);assert.equal(entry.planned,true);
 });
+
+test('monthly history starts at zero and applies carryover before same-day transactions',async()=>{
+ const {runningBankHistory}=await loadModule('app/src/lib/db/bank-history.ts',{});
+ const entries=[{key:'transaction-1',date:'2026-09-15',description:'収入',change:200,planned:false},{key:'carryover',date:'2026-09-15',description:'前月からの繰越金',change:1000,planned:false}];
+ assert.deepEqual(runningBankHistory(entries,0).map(row=>row.cumulative),[1000,1200]);
+ assert.deepEqual(runningBankHistory(entries,500).map(row=>row.cumulative),[1500,1700]);
+ assert.equal(runningBankHistory([],0).length,0);
+});

@@ -15,9 +15,7 @@
 	"images": {
 		"binding": "IMAGES"
 	},
-	"vars": {
-    "DEVELOPER_USER_IDS": "c34a94a8-fcb8-4ca8-a1ab-6f097059effd"
-  },
+	"vars": {},
 	"observability": {
 		"enabled": true
 	},

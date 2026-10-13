@@ -1,5 +1,24 @@
--- Docker only. Do not apply to remote Supabase.
+-- Administration is based on current Auth app_metadata, never user_metadata or a fixed UUID.
 begin;
+create schema if not exists private;
+revoke all on schema private from public;
+grant usage on schema private to authenticated;
+
+-- SECURITY DEFINER is required only to read the caller's protected Auth record.
+-- No arguments: a caller cannot inspect another user's privileges.
+create or replace function private.is_admin()
+returns boolean language sql stable security definer set search_path = '' as $$
+  select exists (
+    select 1 from auth.users
+    where id = (select auth.uid())
+      and raw_app_meta_data -> 'role' = '"admin"'::jsonb
+  );
+$$;
+revoke all on function private.is_admin() from public, anon;
+grant execute on function private.is_admin() to authenticated;
+
+-- Supabase administrator only.
+
 create or replace function public.normalize_categories()
 returns jsonb
 language plpgsql
@@ -15,8 +34,8 @@ declare
   registered_parents bigint;
   registered_children bigint;
 begin
-  if actor is distinct from 'd629d117-2f96-481b-9980-329fbf581f68'::uuid then
-    raise exception 'Developer access required' using errcode = '42501';
+  if not private.is_admin() then
+    raise exception 'Administrator access required' using errcode = '42501';
   end if;
 
   -- Snapshot the user's distinct pairs together to retain their relationships.

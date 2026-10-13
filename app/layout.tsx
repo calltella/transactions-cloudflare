@@ -16,7 +16,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
   const authenticated = !error && user;
   return (
     <html lang="ja">
-      <body><Navigation email={authenticated ? user.email ?? "ユーザー" : null} administrator={!!authenticated && isDeveloper(user.id)} />{children}</body>
+      <body><Navigation email={authenticated ? user.email ?? "ユーザー" : null} administrator={!!authenticated && isDeveloper(user)} />{children}</body>
     </html>
   );
 }

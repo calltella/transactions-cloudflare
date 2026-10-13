@@ -28,6 +28,17 @@ export async function mutateBankTransaction(form: FormData) {
     const bank = await supabase.from("bank_accounts").select("payment_method_id").eq("id", bankId).eq("user_id", user.id).maybeSingle();
     if (bank.error || !bank.data) return { success: false, message: "口座を取得できませんでした。" };
     const method = bank.data.payment_method_id;
+    if (id !== null) {
+      const existing = await supabase.from("transactions").select("id,transfer_id").eq("id", id).eq("user_id", user.id).eq("payment_method_id", method).maybeSingle();
+      if (existing.error || !existing.data) return { success: false, message: "取引を取得できませんでした。" };
+      if (existing.data.transfer_id) {
+        if (operation !== "delete") return { success: false, message: "振替は削除してから再登録してください。" };
+        const result = await supabase.rpc("delete_bank_transfer", { transaction_id: id, bank_id: bankId });
+        if (result.error) return { success: false, message: "振替を削除できませんでした。" };
+        revalidatePath("/bank-accounts", "layout"); revalidatePath("/");
+        return { success: true, message: "両口座の振替を削除しました。" };
+      }
+    }
     if (values) {
       const type = await supabase.from("transaction_types").select("id,name").eq("id", values.type_id).maybeSingle();
       if (type.error || !type.data || !["収入", "支出"].includes(type.data.name)) return { success: false, message: "収入・支出を選択してください。" };

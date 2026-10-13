@@ -38,6 +38,9 @@
     "start": "wrangler dev --config dist/server/wrangler.json",
     "deploy": "vinext-cloudflare deploy --config dist/server/wrangler.json",
     "preview": "npm run build && npm run start --",
-    "cf-typegen": "wrangler types --env-interface CloudflareEnv ./worker-configuration.d.ts"
+    "cf-typegen": "wrangler types --env-interface CloudflareEnv ./worker-configuration.d.ts",
+    "supabase:setup": "node scripts/build-supabase-setup.mjs",
+    "supabase:setup:check": "node scripts/build-supabase-setup.mjs --check",
+    "supabase:setup:verify": "node scripts/verify-supabase-setup.mjs"
   }
 }

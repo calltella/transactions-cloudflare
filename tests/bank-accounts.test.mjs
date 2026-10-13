@@ -35,3 +35,23 @@ for (const overrides of [{ opening_balance: "1.2" }, { opening_balance_date: "20
     assert.equal((await module.saveBankAccount(form(overrides))).success, false);
   });
 }
+
+test('bank account creation validates a name and saves through atomic RPC without client ownership', async () => {
+ let args;
+ const module = await loadModule('app/bank-accounts/actions.ts', {
+  'next/cache': {revalidatePath:()=>{}},
+  '@/src/lib/db/user': {getUserDatabase:async()=>({user:{id:'verified'},supabase:{rpc:async(name,values)=>{assert.equal(name,'create_bank_account');args=values;return {data:10,error:null}}}})}
+ });
+ assert.equal((await module.createBankAccount(form({account_name:'   '}))).success,false);
+ assert.equal(args,undefined);
+ assert.equal((await module.createBankAccount(form({account_name:'  生活費口座  ',user_id:'forged'}))).accountId,10);
+ assert.equal(args.account_name,'生活費口座');assert.equal(args.user_id,undefined);assert.equal(args.opening_balance,-100);
+});
+test('bank account creation reports duplicate names without modifying existing accounts', async () => {
+ const module=await loadModule('app/bank-accounts/actions.ts',{
+  'next/cache': {revalidatePath:()=>assert.fail()},
+  '@/src/lib/db/user': {getUserDatabase:async()=>({supabase:{rpc:async()=>({data:null,error:{code:'23505'}})}})}
+ });
+ const result=await module.createBankAccount(form({account_name:'生活費口座'}));
+ assert.equal(result.success,false);assert.match(result.message,/既に登録/);
+});

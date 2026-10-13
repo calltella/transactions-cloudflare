@@ -2,22 +2,20 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { loadModule } from "./module-loader.mjs";
 
-const developerId = "c34a94a8-fcb8-4ca8-a1ab-6f097059effd";
-
 for (const scenario of [
   { name: "anonymous", user: null, status: 401 },
-  { name: "ordinary user with forged profile role", user: { id: "other", user_metadata: { role: "developer" } }, status: 403 },
-  { name: "developer", user: { id: developerId }, status: 200 },
-  { name: "Docker developer", user: { id: "d629d117-2f96-481b-9980-329fbf581f68" }, allowedIds: "d629d117-2f96-481b-9980-329fbf581f68", status: 200 },
-  { name: "remote developer rejected by Docker", user: { id: developerId }, allowedIds: "d629d117-2f96-481b-9980-329fbf581f68", status: 403 },
-  { name: "Docker developer rejected remotely", user: { id: "d629d117-2f96-481b-9980-329fbf581f68" }, status: 403 },
-  { name: "empty allowlist", user: { id: developerId }, allowedIds: "", status: 403 },
-  { name: "invalid session", user: { id: developerId }, error: new Error("expired"), status: 401 },
+  { name: "forged user metadata", user: { id: "other", user_metadata: { role: "admin" } }, status: 403 },
+  { name: "administrator", user: { id: "any-user-id", app_metadata: { role: "admin" } }, status: 200 },
+  { name: "old fixed administrator ID without metadata", user: { id: "c34a94a8-fcb8-4ca8-a1ab-6f097059effd" }, status: 403 },
+  { name: "ordinary app role", user: { id: "other", app_metadata: { role: "user" } }, status: 403 },
+  { name: "invalid metadata role", user: { id: "other", app_metadata: { role: true } }, status: 403 },
+  { name: "removed administrator", user: { id: "former-admin", app_metadata: {} }, status: 403 },
+  { name: "invalid session", user: { id: "admin", app_metadata: { role: "admin" } }, error: new Error("expired"), status: 401 },
 ]) {
   test(`DB API: ${scenario.name}`, async () => {
     let dbCalls = 0;
     const route = await loadModule("app/api/developer/db-test/route.ts", {
-      "cloudflare:workers": { env: { DEVELOPER_USER_IDS: scenario.allowedIds ?? developerId, HYPERDRIVE: {} } },
+      "cloudflare:workers": { env: { HYPERDRIVE: {} } },
       "next/headers": { cookies: async () => ({}) },
       "@/utils/supabase/server": { createClient: () => ({ auth: {
         getUser: async () => ({ data: { user: scenario.user }, error: scenario.error }),

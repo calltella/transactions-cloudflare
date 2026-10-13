@@ -1,2 +1,1 @@
 # Local Workers/Docker only. Copy this setting to .dev.vars.
-DEVELOPER_USER_IDS="d629d117-2f96-481b-9980-329fbf581f68"

@@ -9,7 +9,7 @@ export type NormalizePaymentMethodsResult = { success: boolean; message: string 
 export async function normalizePaymentMethods(): Promise<NormalizePaymentMethodsResult> {
   try {
     const { supabase, user } = await getUserDatabase();
-    if (!isDeveloper(user.id)) return { success: false, message: "開発者のみ実行できます。" };
+    if (!isDeveloper(user)) return { success: false, message: "管理者のみ実行できます。" };
     const { data, error } = await supabase.rpc("normalize_payment_methods", {});
     if (error) {
       // Log only the error code; DB details can contain private record values.

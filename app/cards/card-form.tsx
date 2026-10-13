@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { CreditCardRow } from "@/src/lib/db/database.types";
@@ -7,7 +8,8 @@ import { saveCreditCard } from "./actions";
 
 type Method = { id: number; name: string; type: string };
 export default function CardForm({ methods, cards }: { methods: Method[]; cards: CreditCardRow[] }) {
-  const cardMethods = methods.filter(m => m.type === "credit_card");
+  const positions = new Map(cards.map((item,index) => [item.payment_method_id,index]));
+  const cardMethods = [...methods.filter(m => m.type === "credit_card")].sort((a,b) => (positions.get(a.id) ?? Infinity) - (positions.get(b.id) ?? Infinity));
   const accounts = methods.filter(m => m.type === "bank_account");
   const [selected, setSelected] = useState(String(cardMethods[0]?.id ?? ""));
   const [busy, setBusy] = useState(false);
@@ -35,6 +37,7 @@ export default function CardForm({ methods, cards }: { methods: Method[]; cards:
         {cardMethods.map(m => <option key={m.id} value={m.id}>{m.name}{cards.some(c => c.payment_method_id === m.id) ? "（設定済み）" : "（未設定）"}</option>)}
       </select>
     </label>
+    {card && <Link href={`/cards/${card.id}`} className="inline-block text-sm text-indigo-600 dark:text-indigo-300">利用明細を見る →</Link>}
     <form key={`${selected}:${card?.updated_at ?? "new"}`} onSubmit={submit} className="space-y-5">
       <fieldset disabled={busy} className="space-y-5">
         <input type="hidden" name="payment_method_id" value={selected} />

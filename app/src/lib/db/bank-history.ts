@@ -6,7 +6,7 @@ export type BankHistoryEntry = {
   planned: boolean;
 };
 
-import { nextCardPaymentPeriod, cardPaymentAmount } from "./card-payment";
+import { nextCardPaymentPeriod, cardPaymentAmount, cardBillingDate } from "./card-payment";
 import type { CreditCardRow } from "./database.types";
 import type { DashboardTransaction } from "./dashboard-calculations";
 
@@ -28,10 +28,10 @@ export function bankCardPayments(start: string, end: string, cards: CreditCardRo
 
 export function plannedCardEntry(payment: ReturnType<typeof bankCardPayments>[number],
   rows: DashboardTransaction[], types: { id: number; name: string }[], name: string, today: string): BankHistoryEntry {
-  const amount = cardPaymentAmount(rows, payment.card.payment_method_id, types, payment.period, today);
+  const amount = cardPaymentAmount(rows, payment.card.payment_method_id, types, payment.period, today, payment.card.closing_day);
   const typeNames = new Map(types.map(type => [type.id, type.name]));
   const unknown = rows.some(row => row.payment_method_id === payment.card.payment_method_id
-    && row.date >= payment.period.start && row.date <= payment.period.end && row.date <= today
+    && cardBillingDate(row,payment.card.closing_day) >= payment.period.start && cardBillingDate(row,payment.card.closing_day) <= payment.period.end && row.date <= today
     && (row.type_id === null || !["収入", "支出"].includes(typeNames.get(row.type_id) ?? "")
       || row.amount === null || !Number.isSafeInteger(row.amount)));
   return { key: `card-${payment.card.id}-${payment.period.due}`, date: payment.period.due,

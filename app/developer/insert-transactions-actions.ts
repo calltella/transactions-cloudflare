@@ -9,7 +9,7 @@ export type InsertTransactionsResult = { success: boolean; message: string };
 export async function insertNormalizedTransactions(): Promise<InsertTransactionsResult> {
   try {
     const { supabase, user } = await getUserDatabase();
-    if (!isDeveloper(user.id)) return { success: false, message: "開発者のみ実行できます。" };
+    if (!isDeveloper(user)) return { success: false, message: "管理者のみ実行できます。" };
     const { data, error } = await supabase.rpc("insert_normalized_transactions", {});
     if (error) {
       console.error("insert_normalized_transactions RPC failed", { code: error.code });

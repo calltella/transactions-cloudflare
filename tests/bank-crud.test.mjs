@@ -10,7 +10,7 @@ for(const operation of ['create','update','delete'])test(`bank transaction ${ope
   '@/src/lib/db/user':{getUserDatabase:async()=>({user:{id:'verified'},supabase:{from:table=>{
    if(table==='bank_accounts')return {select:()=>({eq:()=>({eq:()=>({maybeSingle:async()=>({data:{payment_method_id:5},error:null})})})})};
    if(table==='transaction_types')return {select:()=>({eq:()=>({maybeSingle:async()=>({data:{id:2,name:'支出'},error:null})})})};
-   assert.equal(table,'transactions');return {insert:values=>{written=values;return chain},update:values=>{written=values;return chain},delete:()=>chain};
+   assert.equal(table,'transactions');return {select:()=>({eq:()=>({eq:()=>({eq:()=>({maybeSingle:async()=>({data:{id:7,transfer_id:null},error:null})})})})}),insert:values=>{written=values;return chain},update:values=>{written=values;return chain},delete:()=>chain};
   }}})}
  });
  const form=new FormData();for(const [key,value] of Object.entries({bank_id:'1',id:'7',operation,date:'2026-10-11',amount:'100',type_id:'2',memo:'メモ',location:'',note:'',tag:'',user_id:'forged',payment_method_id:'999'}))form.set(key,value);

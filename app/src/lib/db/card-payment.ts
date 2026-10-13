@@ -25,12 +25,32 @@ export function nextCardPaymentPeriod(today: string, card: Schedule) {
   return { start: iso(start), end, due, open: end > today };
 }
 
+/** Deferred statements belong to the cycle after the original closing date; usage dates stay intact. */
+export function cardBillingDate(row: Pick<DashboardTransaction, "date" | "card_deferred">, closingDay: number | null) {
+  if (!row.card_deferred || closingDay === null || closingDay < 0 || closingDay > 31) return row.date;
+  const [year, month] = row.date.split("-").map(Number);
+  const closing = (offset: number) => {
+    const last = new Date(Date.UTC(year,month+offset,0)).getUTCDate();
+    return new Date(Date.UTC(year,month-1+offset,closingDay === 0 ? last : Math.min(closingDay,last)));
+  };
+  let end = closing(0);
+  if (end.toISOString().slice(0,10) < row.date) end = closing(1);
+  end.setUTCDate(end.getUTCDate()+1);
+  return end.toISOString().slice(0,10);
+}
+
+export function cardQueryStart(start: string) {
+  const date = new Date(`${start}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate()-32);
+  return date.toISOString().slice(0,10);
+}
+
 export function cardPaymentAmount(rows: DashboardTransaction[], methodId: number,
-  types: { id: number; name: string }[], period: { start: string; end: string }, today: string) {
+  types: { id: number; name: string }[], period: { start: string; end: string }, today: string, closingDay: number | null = null) {
   const spendingTypes = new Set(types.filter(type => type.name === "支出").map(type => type.id));
   const sum = rows.reduce((total, row) => row.payment_method_id === methodId
-    && row.type_id !== null && spendingTypes.has(row.type_id) && row.date >= period.start
-    && row.date <= period.end && row.date <= today && row.amount !== null && Number.isSafeInteger(row.amount)
+    && row.type_id !== null && spendingTypes.has(row.type_id) && cardBillingDate(row,closingDay) >= period.start
+    && cardBillingDate(row,closingDay) <= period.end && row.date <= today && row.amount !== null && Number.isSafeInteger(row.amount)
       ? total + row.amount : total, 0);
   return Math.max(0, sum);
 }

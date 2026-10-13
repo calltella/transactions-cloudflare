@@ -1,33 +1,15 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { bankAccountInput } from "@/src/lib/db/bank-account-input";
 import { getUserDatabase } from "@/src/lib/db/user";
 
 export async function saveBankAccount(form: FormData): Promise<{ success: boolean; message: string }> {
   let values;
   try {
-    const text = (key: string, max: number) => {
-      const value = form.get(key);
-      if (typeof value !== "string" || value.length > max) throw new Error("invalid");
-      return value.trim() || null;
-    };
     const rawId = form.get("payment_method_id");
-    if (typeof rawId !== "string" || !/^\d+$/.test(rawId)) throw new Error("invalid");
-    const payment_method_id = Number(rawId);
-    if (!Number.isSafeInteger(payment_method_id) || payment_method_id < 1) throw new Error("invalid");
-    const balance = form.get("opening_balance");
-    if (typeof balance !== "string" || (balance !== "" && !/^-?\d+$/.test(balance))) throw new Error("invalid");
-    const opening_balance = balance === "" ? null : Number(balance);
-    if (opening_balance !== null && !Number.isSafeInteger(opening_balance)) throw new Error("invalid");
-    const opening_balance_date = text("opening_balance_date", 10);
-    if ((opening_balance === null) !== (opening_balance_date === null)) throw new Error("invalid");
-    if (opening_balance_date && (!/^\d{4}-\d{2}-\d{2}$/.test(opening_balance_date)
-      || opening_balance_date.startsWith("0000")
-      || !Number.isFinite(Date.parse(opening_balance_date))
-      || new Date(opening_balance_date).toISOString().slice(0, 10) !== opening_balance_date)) throw new Error("invalid");
-    values = { payment_method_id, bank_name: text("bank_name", 200), branch_name: text("branch_name", 200),
-      account_holder: text("account_holder", 200), opening_balance, opening_balance_date,
-      is_active: form.get("is_active") === "on", memo: text("memo", 5000) };
+    if (typeof rawId !== "string" || !/^\d+$/.test(rawId) || !Number.isSafeInteger(Number(rawId)) || Number(rawId) < 1) throw new Error("invalid");
+    values = { payment_method_id: Number(rawId), ...bankAccountInput(form) };
   } catch {
     return { success: false, message: "入力内容を確認してください。開始残高は整数で、基準日とセットで入力してください。" };
   }
@@ -47,4 +29,22 @@ export async function saveBankAccount(form: FormData): Promise<{ success: boolea
   } catch {
     return { success: false, message: "保存できませんでした。ログイン状態と接続を確認してください。" };
   }
+}
+
+export async function createBankAccount(form: FormData): Promise<{ success: boolean; message: string; accountId?: number }> {
+  try {
+    const name = form.get("account_name");
+    if (typeof name !== "string" || !name.trim() || name.trim().length > 200) return { success: false, message: "口座名を200文字以内で入力してください。" };
+    const values = bankAccountInput(form);
+    const { supabase } = await getUserDatabase();
+    const result = await supabase.rpc("create_bank_account", { account_name: name.trim(), ...values });
+    if (result.error || !result.data) {
+      const message = result.error?.code === "23505" ? "同じ口座名は既に登録されています。別の名前を指定してください。"
+        : result.error?.code === "22023" ? "口座名が他の支払方法に使われているか、入力内容が不正です。"
+        : "銀行口座を登録できませんでした。ログイン状態と接続を確認してください。";
+      return { success: false, message };
+    }
+    revalidatePath("/bank-accounts", "layout"); revalidatePath("/");
+    return { success: true, message: "銀行口座を登録しました。", accountId: result.data };
+  } catch { return { success: false, message: "入力内容を確認してください。開始残高は整数で、基準日とセットで入力してください。" }; }
 }

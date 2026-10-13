@@ -9,7 +9,7 @@ export type NormalizeCategoriesResult = { success: boolean; message: string };
 export async function normalizeCategories(): Promise<NormalizeCategoriesResult> {
   try {
     const { supabase, user } = await getUserDatabase();
-    if (!isDeveloper(user.id)) return { success: false, message: "開発者のみ実行できます。" };
+    if (!isDeveloper(user)) return { success: false, message: "管理者のみ実行できます。" };
     const { data, error } = await supabase.rpc("normalize_categories", {});
     if (error) {
       // Log only the error code; DB details can contain private record values.

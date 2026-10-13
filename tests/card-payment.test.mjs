@@ -25,3 +25,17 @@ test('payment amount filters by card and billing cycle and subtracts refunds',as
  assert.equal(cardPaymentAmount(rows,5,types,{start:'2026-09-16',end:'2026-10-15'},'2026-10-11'),800);
  assert.equal(cardPaymentAmount([row('2026-10-11',5,2,-200)],5,types,{start:'2026-09-16',end:'2026-10-15'},'2026-10-11'),0);
 });
+
+test('deferred charges retain usage dates and move exactly one closing cycle',async()=>{
+ const {cardBillingDate,cardPaymentAmount}=await loadModule('app/src/lib/db/card-payment.ts',{});
+ const row={date:'2026-07-10',type_id:2,payment_method_id:5,amount:6740,card_deferred:true};
+ assert.equal(cardBillingDate(row,10),'2026-07-11');assert.equal(row.date,'2026-07-10');
+ const types=[{id:2,name:'支出'}];
+ assert.equal(cardPaymentAmount([row],5,types,{start:'2026-06-11',end:'2026-07-10'},'2026-10-14',10),0);
+ assert.equal(cardPaymentAmount([row],5,types,{start:'2026-07-11',end:'2026-08-10'},'2026-10-14',10),6740);
+ assert.equal(cardPaymentAmount([{...row,card_deferred:false}],5,types,{start:'2026-06-11',end:'2026-07-10'},'2026-10-14',10),6740);
+ assert.equal(cardPaymentAmount([{...row,amount:-1000}],5,types,{start:'2026-07-11',end:'2026-08-10'},'2026-10-14',10),0);
+ assert.equal(cardBillingDate({...row,date:'2024-02-29'},0),'2024-03-01');
+ assert.equal(cardBillingDate({...row,date:'2026-12-31'},31),'2027-01-01');
+ assert.equal(cardBillingDate({...row,date:'2026-07-11'},10),'2026-08-11');
+});

@@ -1,3 +1,6 @@
+import { resolveMonthlyBalance } from "@/src/lib/db/resolve-monthly-balance";
+import { monthlyOpening } from "@/src/lib/db/monthly-opening";
+import { transactionCategoryNames } from "@/src/lib/db/transaction-categories";
 import Link from "next/link";
 import { Pencil } from "lucide-react";
 import type { Database } from "@/src/lib/db/database.types";
@@ -6,6 +9,10 @@ import { getUserDatabase, UserAuthenticationError } from "@/src/lib/db/user";
 import { dashboardPeriod, todayInJapan, monthPeriod, shiftMonth, dateWithWeekday } from "@/src/lib/db/dashboard-period";
 import { bankCardPayments, plannedCardEntry, runningBankHistory, type BankHistoryEntry } from "@/src/lib/db/bank-history";
 
+import { cardQueryStart } from "@/src/lib/db/card-payment";
+import TransferForm from "../transfer-form";
+import MonthlyBalanceEditor from "./monthly-balance-editor";
+import MonthPicker from "./month-picker";
 import TransactionEditor from "./transaction-editor";
 
 export const dynamic = "force-dynamic";
@@ -22,13 +29,14 @@ export default async function BankHistoryPage({ params, searchParams }: { params
   if (bank.error) return <main className="p-8"><p role="alert">口座を取得できませんでした。</p></main>;
   if (!bank.data) notFound();
   const account = bank.data;
-  const [settings, methods, types, cards] = await Promise.all([
+  const [settings, methods, types, cards, accounts] = await Promise.all([
     supabase.from("dashboard_settings").select("*").eq("user_id", user.id).maybeSingle(),
     supabase.from("payment_methods").select("id,name"),
     supabase.from("transaction_types").select("id,name"),
     supabase.from("credit_cards").select("*").eq("user_id", user.id).eq("bank_account_payment_method_id", account.payment_method_id).eq("is_active", true),
+    supabase.from("bank_accounts").select("id,payment_method_id").eq("user_id", user.id).eq("is_active", true).order("sort_order").order("id"),
   ]);
-  if (methods.error || types.error || cards.error || settings.error) return <main className="p-8"><p role="alert">履歴の設定を取得できませんでした。テーブルと読み取り権限を確認してください。</p></main>;
+  if (methods.error || types.error || cards.error || settings.error || accounts.error) return <main className="p-8"><p role="alert">履歴の設定を取得できませんでした。テーブルと読み取り権限を確認してください。</p></main>;
   const today = todayInJapan();
   let period;
   let selectedMonth = today.slice(0, 7);
@@ -44,9 +52,13 @@ export default async function BankHistoryPage({ params, searchParams }: { params
     }
   }
   catch { return <main className="p-8"><p role="alert">対象期間を計算できませんでした。祝日データの対象年と休日調整の設定を確認してください。</p><Link href={`/bank-accounts/${id}`}>今月へ戻る</Link></main>; }
+  let monthlyBalance;
+  try { monthlyBalance = await resolveMonthlyBalance(supabase,user.id,account,selectedMonth,settings.data,today); }
+  catch(error) { return <main className="p-8"><p role="alert">{error instanceof Error ? error.message : "繰越金を取得できませんでした。"}</p></main>; }
+  const opening = monthlyOpening(monthlyBalance), carryover = monthlyBalance.carryover_amount;
   const payments = bankCardPayments(period.start, period.end, cards.data ?? []);
-  let earliest = account.opening_balance_date && account.opening_balance_date < period.start ? account.opening_balance_date : period.start;
-  for (const payment of payments) if (payment.period.start < earliest) earliest = payment.period.start;
+  let earliest = period.start;
+  for (const payment of payments) if (cardQueryStart(payment.period.start) < earliest) earliest = cardQueryStart(payment.period.start);
   const rows: Database["public"]["Tables"]["transactions"]["Row"][] = [];
   const ids = [...new Set([account.payment_method_id, ...(cards.data ?? []).map(card => card.payment_method_id)])];
   for (let offset = 0; ; offset += 500) {
@@ -55,17 +67,17 @@ export default async function BankHistoryPage({ params, searchParams }: { params
     if (error) return <main className="p-8"><p role="alert">取引履歴を取得できませんでした。</p></main>;
     rows.push(...(data ?? [])); if (!data || data.length < 500) break;
   }
+  let categories;
+  try { categories = await transactionCategoryNames(supabase,rows); }
+  catch { return <main className="p-8"><p role="alert">カテゴリを取得できませんでした。</p></main>; }
   const typeNames = new Map((types.data ?? []).map(type => [type.id, type.name]));
   const names = new Map((methods.data ?? []).map(method => [method.id, method.name]));
-  let opening: number | null = account.opening_balance !== null && account.opening_balance_date !== null && account.opening_balance_date <= period.start ? account.opening_balance : null;
   const entries: BankHistoryEntry[] = [];
   for (const row of rows) {
     if (row.payment_method_id !== account.payment_method_id) continue;
     const type = row.type_id === null ? undefined : typeNames.get(row.type_id);
     const change = row.amount !== null && Number.isSafeInteger(row.amount) && (type === "収入" || type === "支出") ? (type === "収入" ? row.amount : -row.amount) : null;
-    if (row.date < period.start) {
-      if (opening !== null && account.opening_balance_date && row.date >= account.opening_balance_date) opening = change === null ? null : opening + change;
-    } else entries.push({ key: `transaction-${row.id}`, date: row.date, description: row.memo || row.location || row.note || type || "取引", change, planned: row.date > today });
+    if (row.date >= period.start) entries.push({ key: `transaction-${row.id}`, date: row.date, description: row.memo || row.location || row.note || type || "取引", change, planned: row.date > today });
   }
   entries.push(...payments
     .map(payment => plannedCardEntry(payment, rows, types.data ?? [], names.get(payment.card.payment_method_id) ?? "カード", today))
@@ -76,16 +88,17 @@ export default async function BankHistoryPage({ params, searchParams }: { params
   return <main className="bg-gray-50 px-4 py-8 text-gray-900 dark:bg-gray-900 dark:text-gray-100"><div className="mx-auto max-w-6xl space-y-6">
     <Link href="/" className="text-sm text-indigo-600 dark:text-indigo-300">← ダッシュボードへ戻る</Link>
     <header><h1 className="text-2xl font-bold">{names.get(account.payment_method_id) ?? "銀行口座"} の取引履歴</h1><p className="mt-2 text-sm text-gray-500">{dateWithWeekday(period.start)} 〜 {dateWithWeekday(period.end)}</p></header>
-    <div className="flex flex-wrap items-center justify-between gap-4"><nav aria-label="対象月" className="flex flex-wrap items-center gap-3"><Link href={`?month=${shiftMonth(selectedMonth, -1)}`} className="rounded-lg border px-3 py-2 text-sm">← 前月</Link><form className="flex gap-2"><input aria-label="対象月" type="month" name="month" defaultValue={selectedMonth} className="rounded-lg border border-gray-300 bg-white p-2 dark:bg-gray-800 dark:border-gray-600"/><button className="rounded-lg border px-3 py-2 text-sm">表示</button></form><Link href={`?month=${shiftMonth(selectedMonth, 1)}`} className="rounded-lg border px-3 py-2 text-sm">翌月 →</Link><Link href={`/bank-accounts/${id}`} className="text-sm text-indigo-600">今月</Link></nav><TransactionEditor bankId={account.id} types={types.data ?? []} date={period.start}/></div>
-    <p className="text-sm text-gray-500 dark:text-gray-400">累計残高は月初残高から計算します。カードは利用明細を表示せず、引き落とし予定を反映します。予定を含む残高は実際の口座残高とは異なります。</p>
+    <div className="flex flex-wrap items-center justify-between gap-4"><nav aria-label="対象月" className="flex flex-wrap items-center gap-3"><Link href={`?month=${shiftMonth(selectedMonth, -1)}`} className="rounded-lg border px-3 py-2 text-sm">← 前月</Link><MonthPicker month={selectedMonth}/><Link href={`?month=${shiftMonth(selectedMonth, 1)}`} className="rounded-lg border px-3 py-2 text-sm">翌月 →</Link><Link href={`/bank-accounts/${id}`} className="text-sm text-indigo-600">今月</Link></nav><div className="flex flex-wrap gap-3"><MonthlyBalanceEditor key={selectedMonth} bankId={account.id} month={selectedMonth} opening={opening} carryover={carryover} override={monthlyBalance.opening_override}/><TransferForm bankId={account.id} date={today} accounts={(accounts.data ?? []).map(bank => ({ id: bank.id, name: names.get(bank.payment_method_id) ?? "銀行口座" }))}/><TransactionEditor bankId={account.id} types={types.data ?? []} date={period.start}/></div></div>
+    <p className="text-sm text-gray-500 dark:text-gray-400">月初金額には前月からの繰越金を使います。個別指定した場合はその金額を優先し、未設定の月は前月の月末残高を繰り越します。カードは利用明細を表示せず、引き落とし予定を反映します。予定を含む残高は実際の口座残高とは異なります。</p>
     <p className="text-xs text-gray-500 dark:text-gray-400">銀行取引に実際のカード引き落としも記録されている場合、予定と両方が反映されます。</p>
-    {opening === null && <p role="alert" className="text-sm text-amber-700 dark:text-amber-300">月初残高を計算できません。開始残高・基準日と、金額・種別が未設定の取引を確認してください。</p>}
+
     {unconfigured.length > 0 && <p role="alert" className="text-sm text-amber-700">支払設定が未完了のカード{unconfigured.length}枚は予定を表示していません。</p>}
-    <section className="overflow-x-auto rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800"><table className="w-full min-w-[640px] text-sm">
-      <thead className="border-b border-gray-200 bg-gray-50 text-left dark:border-gray-700 dark:bg-gray-900"><tr><th className="p-4">日付</th><th className="p-4">内容</th><th className="p-4 text-right">入金</th><th className="p-4 text-right">出金</th><th className="p-4 text-right">累計残高</th><th className="p-4 text-center">操作</th></tr></thead>
-      <tbody><tr className="border-b border-gray-100 dark:border-gray-700"><td className="p-4 whitespace-nowrap">{dateWithWeekday(period.start)}</td><td className="p-4">月初残高</td><td/><td/><td className="p-4 text-right font-semibold">{opening === null ? "未設定" : yen(opening)}</td><td/></tr>
-        {history.map(row => <tr key={row.key} className="border-b border-gray-100 last:border-0 dark:border-gray-700"><td className="p-4 whitespace-nowrap">{dateWithWeekday(row.date)}</td><td className="p-4">{row.description}{row.planned && <span className="ml-2 rounded bg-amber-100 px-2 py-0.5 text-xs text-amber-800 dark:bg-amber-950 dark:text-amber-300">予定</span>}</td><td className="p-4 text-right whitespace-nowrap">{row.change !== null && row.change > 0 ? yen(row.change) : "—"}</td><td className="p-4 text-right whitespace-nowrap">{row.change === null ? "金額不明" : row.change <= 0 ? yen(-row.change) : "—"}</td><td className="p-4 text-right whitespace-nowrap font-semibold">{row.cumulative === null ? "計算不可" : yen(row.cumulative)}</td><td className="p-4 text-center">{transactionMap.has(row.key) ? <TransactionEditor bankId={account.id} transaction={transactionMap.get(row.key)!} types={types.data ?? []} date={row.date}/> : <Link href="/cards" aria-label="カード設定を編集" title="カード設定を編集" className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-indigo-600 hover:bg-indigo-50 dark:text-indigo-300 dark:hover:bg-indigo-950"><Pencil size={18} aria-hidden="true"/></Link>}</td></tr>)}
-        {!history.length && <tr><td colSpan={6} className="p-8 text-center text-gray-500">対象期間の取引・カード引き落とし予定はありません。</td></tr>}
+    <section className="overflow-x-auto rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800"><table className="w-full min-w-[1104px] table-fixed text-sm tabular-nums">
+      <colgroup><col className="w-44"/><col/><col className="w-28"/><col className="w-28"/><col className="w-36"/><col className="w-36"/><col className="w-36"/><col className="w-20"/></colgroup>
+      <thead className="border-b border-gray-200 bg-gray-50 text-left dark:border-gray-700 dark:bg-gray-900"><tr><th className="px-4 py-1.5">日付</th><th className="px-4 py-1.5">内容</th><th className="px-4 py-1.5">親カテゴリ</th><th className="px-4 py-1.5">子カテゴリ</th><th className="px-4 py-1.5 text-right">入金</th><th className="px-4 py-1.5 text-right">出金</th><th className="px-4 py-1.5 text-right">累計残高</th><th className="px-4 py-1.5 text-center">操作</th></tr></thead>
+      <tbody><tr className="border-b border-gray-100 dark:border-gray-700"><td className="px-4 py-1.5 whitespace-nowrap">{dateWithWeekday(period.start)}</td><td className="px-4 py-1.5">月初金額{monthlyBalance.automatic && <span className="ml-2 text-xs text-gray-500">（前月繰越）</span>}</td><td/><td/><td/><td/><td className="px-4 py-1.5 text-right font-semibold">{yen(opening)}</td><td/></tr>
+        {history.map(row => <tr key={row.key} className="border-b border-gray-100 last:border-0 dark:border-gray-700"><td className="px-4 py-1.5 whitespace-nowrap">{dateWithWeekday(row.date)}</td><td className="break-words px-4 py-1.5">{row.description}{row.planned && !row.key.startsWith("card-") && <span className="ml-2 rounded bg-amber-100 px-2 py-0.5 text-xs text-amber-800 dark:bg-amber-950 dark:text-amber-300">予定</span>}</td><td className="break-words px-4 py-1.5">{categories.parents.get(transactionMap.get(row.key)?.parent_category_id ?? -1) ?? ""}</td><td className="break-words px-4 py-1.5">{categories.children.get(transactionMap.get(row.key)?.child_category_id ?? -1) ?? ""}</td><td className="px-4 py-1.5 text-right whitespace-nowrap">{row.change !== null && row.change > 0 ? yen(row.change) : ""}</td><td className="px-4 py-1.5 text-right whitespace-nowrap">{row.change === null ? "金額不明" : row.change < 0 ? yen(-row.change) : ""}</td><td className="px-4 py-1.5 text-right whitespace-nowrap font-semibold">{row.cumulative === null ? "計算不可" : yen(row.cumulative)}</td><td className="px-4 py-1.5 text-center leading-none">{row.key === "carryover" ? <MonthlyBalanceEditor compact bankId={account.id} month={selectedMonth} opening={opening} carryover={carryover} override={monthlyBalance.opening_override}/> : transactionMap.has(row.key) ? <TransactionEditor bankId={account.id} transaction={transactionMap.get(row.key)!} types={types.data ?? []} date={row.date}/> : <Link href="/cards" aria-label="カード設定を編集" title="カード設定を編集" className="inline-flex h-5 w-5 align-middle items-center justify-center rounded-lg text-indigo-600 hover:bg-indigo-50 dark:text-indigo-300 dark:hover:bg-indigo-950"><Pencil size={18} aria-hidden="true"/></Link>}</td></tr>)}
+        {!history.length && <tr><td colSpan={8} className="p-8 text-center text-gray-500">対象期間の取引・カード引き落とし予定はありません。</td></tr>}
       </tbody></table></section>
   </div></main>;
 }

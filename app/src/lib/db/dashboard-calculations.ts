@@ -1,4 +1,4 @@
-export type DashboardTransaction = { date: string; payment_method_id: number | null; type_id: number | null; amount: number | null };
+export type DashboardTransaction = { date: string; payment_method_id: number | null; type_id: number | null; amount: number | null; transfer_id?: string | null; card_deferred?: boolean };
 
 export function summarizeTransactions(
   rows: DashboardTransaction[], types: { id: number; name: string }[],
@@ -19,7 +19,7 @@ export function summarizeTransactions(
     if (row.amount === null || !Number.isSafeInteger(row.amount)) { missingAmountCount++; continue; }
     if (row.payment_method_id === null) continue;
     const id = row.payment_method_id;
-    if (name === "支出" && row.date >= period.start && row.date <= period.end) {
+    if (!row.transfer_id && name === "支出" && row.date >= period.start && row.date <= period.end) {
       spending.set(id, (spending.get(id) ?? 0) + row.amount);
     }
     const balance = balances.get(id);
