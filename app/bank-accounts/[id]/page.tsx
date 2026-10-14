@@ -1,3 +1,5 @@
+import BackToDashboard from "@/components/back-to-dashboard";
+import FeatureIcon from "@/components/feature-icon";
 import { resolveMonthlyBalance } from "@/src/lib/db/resolve-monthly-balance";
 import { monthlyOpening } from "@/src/lib/db/monthly-opening";
 import { transactionCategoryNames } from "@/src/lib/db/transaction-categories";
@@ -18,7 +20,7 @@ import TransactionEditor from "./transaction-editor";
 export const dynamic = "force-dynamic";
 const yen = (amount: number) => new Intl.NumberFormat("ja-JP", { style: "currency", currency: "JPY" }).format(amount);
 
-export default async function BankHistoryPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ month?: string }> }) {
+export default async function BankHistoryPage({ params, searchParams, cash = false }: { cash?: boolean; params: Promise<{ id: string }>; searchParams: Promise<{ month?: string }> }) {
   const { id } = await params;
   if (!/^\d+$/.test(id) || !Number.isSafeInteger(Number(id)) || Number(id) < 1) notFound();
   let context;
@@ -29,14 +31,17 @@ export default async function BankHistoryPage({ params, searchParams }: { params
   if (bank.error) return <main className="p-8"><p role="alert">口座を取得できませんでした。</p></main>;
   if (!bank.data) notFound();
   const account = bank.data;
+  const base = cash ? "/cash" : "/bank-accounts";
   const [settings, methods, types, cards, accounts] = await Promise.all([
     supabase.from("dashboard_settings").select("*").eq("user_id", user.id).maybeSingle(),
-    supabase.from("payment_methods").select("id,name"),
+    supabase.from("payment_methods").select("id,name,type"),
     supabase.from("transaction_types").select("id,name"),
     supabase.from("credit_cards").select("*").eq("user_id", user.id).eq("bank_account_payment_method_id", account.payment_method_id).eq("is_active", true),
     supabase.from("bank_accounts").select("id,payment_method_id").eq("user_id", user.id).eq("is_active", true).order("sort_order").order("id"),
   ]);
   if (methods.error || types.error || cards.error || settings.error || accounts.error) return <main className="p-8"><p role="alert">履歴の設定を取得できませんでした。テーブルと読み取り権限を確認してください。</p></main>;
+  const method = methods.data?.find(m => m.id === account.payment_method_id);
+  if ((method?.type === "cash") !== cash) notFound();
   const today = todayInJapan();
   let period;
   let selectedMonth = today.slice(0, 7);
@@ -51,7 +56,7 @@ export default async function BankHistoryPage({ params, searchParams }: { params
       for (const offset of [-1, 0, 1]) { const month = shiftMonth(today.slice(0, 7), offset); if (monthPeriod(month, startDay, endDay, adjustment).start === period.start) { selectedMonth = month; break; } }
     }
   }
-  catch { return <main className="p-8"><p role="alert">対象期間を計算できませんでした。祝日データの対象年と休日調整の設定を確認してください。</p><Link href={`/bank-accounts/${id}`}>今月へ戻る</Link></main>; }
+  catch { return <main className="p-8"><p role="alert">対象期間を計算できませんでした。祝日データの対象年と休日調整の設定を確認してください。</p><Link href={`${base}/${id}`}>今月へ戻る</Link></main>; }
   let monthlyBalance;
   try { monthlyBalance = await resolveMonthlyBalance(supabase,user.id,account,selectedMonth,settings.data,today); }
   catch(error) { return <main className="p-8"><p role="alert">{error instanceof Error ? error.message : "繰越金を取得できませんでした。"}</p></main>; }
@@ -85,12 +90,12 @@ export default async function BankHistoryPage({ params, searchParams }: { params
   const transactionMap = new Map(rows.filter(row => row.payment_method_id === account.payment_method_id).map(row => [`transaction-${row.id}`, row]));
   const history = runningBankHistory(entries, opening);
   const unconfigured = (cards.data ?? []).filter(card => card.closing_day === null || card.payment_day === null || !Number.isInteger(card.payment_month_offset));
-  return <main className="bg-gray-50 px-4 py-8 text-gray-900 dark:bg-gray-900 dark:text-gray-100"><div className="mx-auto max-w-6xl space-y-6">
-    <Link href="/" className="text-sm text-indigo-600 dark:text-indigo-300">← ダッシュボードへ戻る</Link>
-    <header><h1 className="text-2xl font-bold">{names.get(account.payment_method_id) ?? "銀行口座"} の取引履歴</h1><p className="mt-2 text-sm text-gray-500">{dateWithWeekday(period.start)} 〜 {dateWithWeekday(period.end)}</p></header>
-    <div className="flex flex-wrap items-center justify-between gap-4"><nav aria-label="対象月" className="flex flex-wrap items-center gap-3"><Link href={`?month=${shiftMonth(selectedMonth, -1)}`} className="rounded-lg border px-3 py-2 text-sm">← 前月</Link><MonthPicker month={selectedMonth}/><Link href={`?month=${shiftMonth(selectedMonth, 1)}`} className="rounded-lg border px-3 py-2 text-sm">翌月 →</Link><Link href={`/bank-accounts/${id}`} className="text-sm text-indigo-600">今月</Link></nav><div className="flex flex-wrap gap-3"><MonthlyBalanceEditor key={selectedMonth} bankId={account.id} month={selectedMonth} opening={opening} carryover={carryover} override={monthlyBalance.opening_override}/><TransferForm bankId={account.id} date={today} accounts={(accounts.data ?? []).map(bank => ({ id: bank.id, name: names.get(bank.payment_method_id) ?? "銀行口座" }))}/><TransactionEditor bankId={account.id} types={types.data ?? []} date={period.start}/></div></div>
-    <p className="text-sm text-gray-500 dark:text-gray-400">月初金額には前月からの繰越金を使います。個別指定した場合はその金額を優先し、未設定の月は前月の月末残高を繰り越します。カードは利用明細を表示せず、引き落とし予定を反映します。予定を含む残高は実際の口座残高とは異なります。</p>
-    <p className="text-xs text-gray-500 dark:text-gray-400">銀行取引に実際のカード引き落としも記録されている場合、予定と両方が反映されます。</p>
+  return <main data-theme={cash ? "cash" : "bank"} className="bg-gray-50 px-4 py-8 text-gray-900 dark:bg-gray-900 dark:text-gray-100"><div className="mx-auto max-w-6xl space-y-6">
+    <BackToDashboard/>
+    <header><h1 className="flex items-center gap-3 text-2xl font-bold"><FeatureIcon kind={cash ? "cash" : "bank"}/>{names.get(account.payment_method_id) ?? "銀行口座"} の取引履歴</h1><p className="mt-2 text-sm text-gray-500">{dateWithWeekday(period.start)} 〜 {dateWithWeekday(period.end)}</p></header>
+    <div className="flex flex-wrap items-center justify-between gap-4"><nav aria-label="対象月" className="flex flex-wrap items-center gap-3"><Link href={`?month=${shiftMonth(selectedMonth, -1)}`} className="rounded-lg border px-3 py-2 text-sm">← 前月</Link><MonthPicker month={selectedMonth}/><Link href={`?month=${shiftMonth(selectedMonth, 1)}`} className="rounded-lg border px-3 py-2 text-sm">翌月 →</Link><Link href={`${base}/${id}`} className="text-sm text-indigo-600">今月</Link></nav><div className="flex flex-wrap gap-3"><MonthlyBalanceEditor key={selectedMonth} bankId={account.id} month={selectedMonth} opening={opening} carryover={carryover} override={monthlyBalance.opening_override}/><TransferForm bankId={account.id} date={today} accounts={(accounts.data ?? []).map(bank => ({ id: bank.id, name: names.get(bank.payment_method_id) ?? "銀行口座" }))}/><TransactionEditor bankId={account.id} types={types.data ?? []} date={period.start}/></div></div>
+    <p className="text-sm text-gray-500 dark:text-gray-400">月初金額には前月からの繰越金を使います。個別指定した場合はその金額を優先し、未設定の月は前月の月末残高を繰り越します。{cash ? "現金の入出金から残高を計算します。" : "カードは利用明細を表示せず、引き落とし予定を反映します。予定を含む残高は実際の口座残高とは異なります。"}</p>
+    {!cash && <p className="text-xs text-gray-500 dark:text-gray-400">銀行取引に実際のカード引き落としも記録されている場合、予定と両方が反映されます。</p>}
 
     {unconfigured.length > 0 && <p role="alert" className="text-sm text-amber-700">支払設定が未完了のカード{unconfigured.length}枚は予定を表示していません。</p>}
     <section className="overflow-x-auto rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800"><table className="w-full min-w-[1104px] table-fixed text-sm tabular-nums">

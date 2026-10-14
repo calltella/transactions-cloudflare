@@ -1,1 +1,2 @@
-# Local Workers/Docker only. Copy this setting to .dev.vars.
+# Local Workers/Docker only.
+# Hyperdrive connection: set the real value in .env.local.

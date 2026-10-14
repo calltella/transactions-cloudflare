@@ -18,7 +18,7 @@ export async function saveMonthlyBalance(form: FormData) {
     if (bank.error || !bank.data) return { success: false, message: "口座を取得できませんでした。" };
     const result = await supabase.from("bank_monthly_balances").upsert({ user_id: user.id, bank_account_id: bankId, month: `${month}-01`, opening_amount: opening, opening_override: form.get("opening_override") === "on", carryover_amount: carryover, updated_at: new Date().toISOString() }, { onConflict: "user_id,bank_account_id,month" }).select("bank_account_id").single();
     if (result.error || !result.data) return { success: false, message: "月初金額・繰越金を保存できませんでした。" };
-    revalidatePath(`/bank-accounts/${bankId}`); revalidatePath("/");
+    revalidatePath(`/bank-accounts/${bankId}`); revalidatePath("/"); revalidatePath("/cash", "layout");
     return { success: true, message: "月初金額・繰越金を保存しました。" };
   } catch { return { success: false, message: "金額と対象月、ログイン状態を確認してください。" }; }
 }

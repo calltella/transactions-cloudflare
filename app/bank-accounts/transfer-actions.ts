@@ -11,7 +11,7 @@ export async function createBankTransfer(form: FormData) {
     const { supabase } = await getUserDatabase();
     const result = await supabase.rpc("create_bank_transfer", { source_bank_id: source, destination_bank_id: destination, transfer_date: date, transfer_amount: amount, transfer_memo: memo });
     if (result.error || !result.data) return { success: false, message: "振替を登録できませんでした。口座の設定と権限を確認してください。" };
-    revalidatePath("/bank-accounts", "layout"); revalidatePath("/");
+    revalidatePath("/bank-accounts", "layout"); revalidatePath("/"); revalidatePath("/cash", "layout");
     return { success: true, message: "口座間振替を登録しました。" };
   } catch { return { success: false, message: "振替を登録できませんでした。入力内容とログイン状態を確認してください。" }; }
 }

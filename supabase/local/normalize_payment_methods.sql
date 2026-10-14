@@ -48,6 +48,7 @@ begin
   get diagnostics deleted_count = row_count;
   insert into public.payment_methods (name, type)
     select name, case
+      when name = '現金' then 'cash'
       when name like '%銀行%' then 'bank_account'
       when name like '%カード%' then 'credit_card'
       else 'other'

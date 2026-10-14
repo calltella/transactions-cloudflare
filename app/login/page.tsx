@@ -1,3 +1,4 @@
+import FeatureIcon from "@/components/feature-icon";
 import { login } from './actions'
 
 export default async function LoginPage({
@@ -12,7 +13,7 @@ export default async function LoginPage({
   return (
     <div className="flex min-h-screen flex-col items-center justify-center py-2 bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
       <div className="w-full max-w-md p-8 space-y-6 bg-white dark:bg-gray-800 rounded shadow-md">
-        <h1 className="text-2xl font-bold text-center">Supabase Authentication</h1>
+        <h1 className="flex items-center gap-3 text-2xl font-bold text-center"><FeatureIcon kind="profile"/>Supabase Authentication</h1>
 
         {error && (
           <div className="p-3 text-sm text-red-700 bg-red-100 dark:bg-red-900/30 dark:text-red-400 rounded">

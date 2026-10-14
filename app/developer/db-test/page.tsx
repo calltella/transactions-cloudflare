@@ -1,3 +1,4 @@
+import FeatureIcon from "@/components/feature-icon";
 "use client";
 // /app/app/db-test/page.tsx
 import { useEffect, useState, useCallback } from "react";
@@ -42,7 +43,7 @@ export default function DbTestPage() {
   }, [runTest]);
 
   return (
-    <main className="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 p-4 md:p-8">
+    <main data-theme="database" className="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 p-4 md:p-8">
       <div className="max-w-3xl mx-auto space-y-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
@@ -61,7 +62,7 @@ export default function DbTestPage() {
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 dark:border-gray-700 pb-4">
             <div>
-              <h1 className="text-2xl font-bold tracking-tight">
+              <h1 className="flex items-center gap-3 text-2xl font-bold tracking-tight"><FeatureIcon kind="database"/>
                 Database Connection Status
               </h1>
               <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">

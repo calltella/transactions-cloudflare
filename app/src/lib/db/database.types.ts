@@ -98,6 +98,10 @@ export interface Database {
         Args: { account_name: string; bank_name: string | null; branch_name: string | null; account_holder: string | null; opening_balance: number | null; opening_balance_date: string | null; is_active: boolean; memo: string | null };
         Returns: number;
       };
+      create_cash_account: {
+        Args: { account_name: string; bank_name: string | null; branch_name: string | null; account_holder: string | null; opening_balance: number | null; opening_balance_date: string | null; is_active: boolean; memo: string | null };
+        Returns: number;
+      };
       create_bank_transfer: {
         Args: { source_bank_id: number; destination_bank_id: number; transfer_date: string; transfer_amount: number; transfer_memo: string };
         Returns: string;

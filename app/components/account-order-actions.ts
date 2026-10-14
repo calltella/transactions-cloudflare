@@ -11,7 +11,7 @@ export async function saveAccountOrder(kind: "bank" | "card", ids: number[]) {
     const { supabase } = await getUserDatabase();
     const { error } = await supabase.rpc("reorder_accounts", { account_kind: kind, account_ids: ids });
     if (error) return { success: false, message: "並び順を保存できませんでした。画面を更新して再度お試しください。" };
-    revalidatePath("/"); revalidatePath("/bank-accounts", "layout"); revalidatePath("/cards");
+    revalidatePath("/"); revalidatePath("/bank-accounts", "layout"); revalidatePath("/cards"); revalidatePath("/cash", "layout");
     return { success: true, message: "並び順を保存しました。" };
   } catch { return { success: false, message: "並び順を保存できませんでした。ログイン状態を確認してください。" }; }
 }

@@ -16,6 +16,7 @@ const migrations = [
   '20261013210505_bank_monthly_balances.sql',
   '20261013214908_card_deferred_billing.sql',
   '20261013221205_monthly_opening_override.sql',
+  '20261014093102_cash_accounts.sql',
 ];
 const parts = [await readFile(path.join(root, 'schema.sql'), 'utf8')];
 for (const name of migrations) {

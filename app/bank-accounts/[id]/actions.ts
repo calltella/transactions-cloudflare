@@ -35,7 +35,7 @@ export async function mutateBankTransaction(form: FormData) {
         if (operation !== "delete") return { success: false, message: "振替は削除してから再登録してください。" };
         const result = await supabase.rpc("delete_bank_transfer", { transaction_id: id, bank_id: bankId });
         if (result.error) return { success: false, message: "振替を削除できませんでした。" };
-        revalidatePath("/bank-accounts", "layout"); revalidatePath("/");
+        revalidatePath("/bank-accounts", "layout"); revalidatePath("/"); revalidatePath("/cash", "layout");
         return { success: true, message: "両口座の振替を削除しました。" };
       }
     }
@@ -49,7 +49,7 @@ export async function mutateBankTransaction(form: FormData) {
         ? await supabase.from("transactions").update(values!).eq("id", id!).eq("user_id", user.id).eq("payment_method_id", method).select("id").maybeSingle()
         : await supabase.from("transactions").delete().eq("id", id!).eq("user_id", user.id).eq("payment_method_id", method).select("id").maybeSingle();
     if (result.error || !result.data) { console.error("bank_transaction_mutation failed", { code: result.error?.code }); return { success: false, message: "操作できませんでした。取引の存在と権限を確認してください。" }; }
-    revalidatePath(`/bank-accounts/${bankId}`); revalidatePath("/");
+    revalidatePath(`/bank-accounts/${bankId}`); revalidatePath("/"); revalidatePath("/cash", "layout");
     return { success: true, message: operation === "delete" ? "取引を削除しました。" : "取引を保存しました。" };
   } catch { return { success: false, message: "操作できませんでした。入力内容とログイン状態を確認してください。" }; }
 }
