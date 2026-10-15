@@ -1,6 +1,6 @@
-import FeatureIcon from "@/components/feature-icon";
 "use client";
-// /app/app/db-test/page.tsx
+
+import FeatureIcon from "@/components/feature-icon";
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 
